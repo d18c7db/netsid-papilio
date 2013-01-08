@@ -43,44 +43,44 @@ architecture behavior of netsid_tb is
 
 	component netsid
 	port(
-		nreset  : in  std_logic;
-		osc_in  : in  std_logic;
-		led     : out std_logic;
-		audio_l : out std_logic;
-		audio_r : out std_logic;
-		usb_txd : in  std_logic;
-		usb_rxd : out std_logic
+		i_reset   : in  std_logic;
+		clk_in    : in  std_logic;
+		led       : out std_logic;
+		o_audio_l : out std_logic;
+		o_audio_r : out std_logic;
+		usb_txd   : in  std_logic;
+		usb_rxd   : out std_logic
 	);
 	end component;
 
 	-- Inputs
 	file stimulus: text open read_mode is stim_file;
-	signal nreset  : std_logic := '1';
-	signal osc_in  : std_logic := '0';
-	signal usb_txd : std_logic := '1';
-	signal button  : std_logic := '1';
+	signal i_reset    : std_logic := '1';
+	signal clk_in     : std_logic := '0';
+	signal usb_txd    : std_logic := '1';
+	signal button     : std_logic := '1';
 
 	-- Outputs
-	signal audio_l  : std_logic := '0';
-	signal audio_r  : std_logic := '0';
-	signal usb_rxd  : std_logic := '1';
-	signal led      : std_logic := '0';
+	signal o_audio_l  : std_logic := '0';
+	signal o_audio_r  : std_logic := '0';
+	signal usb_rxd    : std_logic := '1';
+	signal led        : std_logic := '0';
 
-	signal clock    : std_logic := '1';
-	signal baud_run : std_logic := '0';
+	signal clock      : std_logic := '1';
+	signal baud_run   : std_logic := '0';
 	constant clock_period : time := 31.25 ns;
 	constant baud_period  : time := 500 ns; -- 2Mbps
 begin
 
 	-- Instantiate the Unit Under Test (UUT)
 	uut: netsid port map (
-		nreset 	=> nreset,
-		osc_in 	=> clock,
-		audio_l => audio_l,
-		audio_r => audio_r,
-		led 		=> led,
-		usb_txd => usb_txd,
-		usb_rxd => usb_rxd
+		i_reset 	 => i_reset,
+		clk_in 	 => clock,
+		o_audio_l => o_audio_l,
+		o_audio_r => o_audio_r,
+		led 		 => led,
+		usb_txd   => usb_txd,
+		usb_rxd   => usb_rxd
 	);
 
 	-- Clock process definitions
@@ -117,10 +117,10 @@ begin
 	-- Stimulus process
 	stim_proc: process
 	begin		
-		nreset <= '0';
+		i_reset <= '0';
 		baud_run <= '0';
 		wait for clock_period*5;
-		nreset <= '1';
+		i_reset <= '1';
 		wait for clock_period*10;
 		baud_run <= '1';
 		wait;

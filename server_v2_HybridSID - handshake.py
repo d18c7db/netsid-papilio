@@ -5,7 +5,7 @@ import time
 HOST = 'localhost'
 PORT = 6581
 BAUD = 2000000
-COMPORT = 2
+COMPORT = 4
 
 # Request commands:
 command_list = [ 'FLUSH',

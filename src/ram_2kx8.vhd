@@ -27,10 +27,7 @@ begin
 			WRITE_MODE_A				=> "READ_FIRST",	-- WRITE_FIRST, READ_FIRST or NO_CHANGE
 			WRITE_MODE_B				=> "READ_FIRST",	-- WRITE_FIRST, READ_FIRST or NO_CHANGE
 			SIM_COLLISION_CHECK	=> "NONE" 				-- "NONE", "WARNING", "GENERATE_X_ONLY", "ALL"
-
-
 			)
---		-- The following INIT_xx declarations specify the initial contents of the RAM
 		port map (
 			DOA		=> DOA,
 			ADDRA	=> ADDRA,

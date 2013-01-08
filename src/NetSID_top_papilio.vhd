@@ -42,13 +42,13 @@ library UNISIM;
 
 entity NetSID is
 	port (
-		NRESET							: in  std_logic;	-- active low reset
-		OSC_IN							: in  std_logic;	-- main clock 32Mhz
-		AUDIO_L							: out std_logic;	-- PWM audio out
-		AUDIO_R							: out std_logic;	-- PWM audio out
-		LED									: out std_logic;	-- output LED
-		USB_TXD							: in  std_logic;	-- RS232 data to FPGA
-		USB_RXD							: out std_logic		-- RS232 data from FPGA
+		I_RESET						: in  std_logic;	-- active low reset
+		CLK_IN						: in  std_logic;	-- main clock 32Mhz
+		O_AUDIO_L					: out std_logic;	-- PWM audio out
+		O_AUDIO_R					: out std_logic;	-- PWM audio out
+		LED							: out std_logic;	-- output LED
+		USB_TXD						: in  std_logic;	-- RS232 data to FPGA
+		USB_RXD						: out std_logic	-- RS232 data from FPGA
 		);
 	end;
 
@@ -59,14 +59,14 @@ architecture RTL of NetSID is
 	--
 	component uart_tx
 	Port (
-		data_in							: in  std_logic_vector(7 downto 0);
+		data_in						: in  std_logic_vector(7 downto 0);
 		write_buffer				: in  std_logic;
 		reset_buffer				: in  std_logic;
 		en_16_x_baud				: in  std_logic;
 		serial_out					: out std_logic;
 		buffer_full					: out std_logic;
-		buffer_half_full		: out std_logic;
-		clk									: in  std_logic);
+		buffer_half_full			: out std_logic;
+		clk							: in  std_logic);
 	end component;
 
 	--
@@ -74,15 +74,15 @@ architecture RTL of NetSID is
 	--
 	component uart_rx
 	Port (
-		serial_in						: in  std_logic;
+		serial_in					: in  std_logic;
 		data_out						: out std_logic_vector(7 downto 0);
 		read_buffer					: in  std_logic;
 		reset_buffer				: in  std_logic;
 		en_16_x_baud				: in  std_logic;
-		buffer_data_present	: out std_logic;
+		buffer_data_present		: out std_logic;
 		buffer_full					: out std_logic;
-		buffer_half_full		: out std_logic;
-		clk									: in  std_logic);
+		buffer_half_full			: out std_logic;
+		clk							: in  std_logic);
 	end component;
 
 	type uartsm is (
@@ -107,9 +107,9 @@ architecture RTL of NetSID is
 	);
 
 	signal clk_div					: std_logic_vector(4 downto 0) := (others => '0');
-	signal clk01						: std_logic := '0';	--  1 Mhz
-	signal clk04						: std_logic := '0';	--  4 Mhz
-	signal clk32						: std_logic := '0';	-- 32 Mhz
+	signal clk01					: std_logic := '0';	--  1 Mhz
+	signal clk04					: std_logic := '0';	--  4 Mhz
+	signal clk32					: std_logic := '0';	-- 32 Mhz
 
 	signal stUARTnow				: uartsm := st01;
 	signal stUARTnext				: uartsm := st01;
@@ -119,41 +119,41 @@ architecture RTL of NetSID is
 	signal rx_full					: std_logic := '0';
 	signal tx_half_full			: std_logic := '0';
 	signal rx_half_full			: std_logic := '0';
-	signal write_to_uart		: std_logic := '0';
-	signal rx_data_present	: std_logic := '0';
+	signal write_to_uart			: std_logic := '0';
+	signal rx_data_present		: std_logic := '0';
 	signal en_16_x_baud			: std_logic := '0';
 
-	signal stSIDnow					: RAMtoSIDState := stInit;
+	signal stSIDnow				: RAMtoSIDState := stInit;
 	signal stSIDnext				: RAMtoSIDState := stInit;
-	signal sid_addr					: std_logic_vector(4 downto 0) := (others => '0');
-	signal sid_dout					: std_logic_vector(7 downto 0) := (others => '0');
+	signal sid_addr				: std_logic_vector(4 downto 0) := (others => '0');
+	signal sid_dout				: std_logic_vector(7 downto 0) := (others => '0');
 	signal sid_din					: std_logic_vector(7 downto 0) := (others => '0');
-	signal sid_we						: std_logic := '0';
-	signal sid_px						: std_logic := '0';
-	signal sid_py						: std_logic := '0';
+	signal sid_we					: std_logic := '0';
+	signal sid_px					: std_logic := '0';
+	signal sid_py					: std_logic := '0';
 
-	signal ram_ai						: std_logic_vector(13 downto 0) := (others => '0');
-	signal ram_ao						: std_logic_vector(13 downto 0) := (others => '1');
-	signal ram_do						: std_logic_vector( 7 downto 0) := (others => '0');
+	signal ram_ai					: std_logic_vector(13 downto 0) := (others => '0');
+	signal ram_ao					: std_logic_vector(13 downto 0) := (others => '1');
+	signal ram_do					: std_logic_vector( 7 downto 0) := (others => '0');
 
 	signal cycle_cnt				: std_logic_vector(20 downto 0) := (others => '0');
-	signal nrst							: std_logic := '0';
-	signal rst							: std_logic := '0';
+	signal nrst						: std_logic := '0';
+	signal rst						: std_logic := '0';
 	signal audio_pwm				: std_logic := '0';
-	signal nrxdp						: std_logic := '0';
+	signal nrxdp					: std_logic := '0';
 	signal fifo_empty				: std_logic := '1';
 	signal fifo_stop				: std_logic := '1';
-	signal buf_full					: std_logic := '0';
-	signal buf_full_last		: std_logic := '0';
+	signal buf_full				: std_logic := '0';
+	signal buf_full_last			: std_logic := '0';
 	signal buf_full_fe			: std_logic := '0';
 	signal buf_full_re			: std_logic := '0';
 
 begin
-	AUDIO_L	<= audio_pwm;
-	AUDIO_R	<= audio_pwm;
-	nrst		<= not NRESET;				-- convert active low reset to active high
-	nrxdp		<= not rx_data_present;
-	en_16_x_baud <= '1';					-- held high when running at max speed as per manual
+	O_AUDIO_L		<= audio_pwm;
+	O_AUDIO_R		<= audio_pwm;
+	nrst				<= I_RESET;
+	nrxdp				<= not rx_data_present;
+	en_16_x_baud 	<= '1';					-- held high when running at max speed as per manual
 
   -----------------------------------------------------------------------------
   -- Clocks
@@ -164,15 +164,15 @@ begin
 	-- provides a timed reset signal
 	--
 	u_clocks : entity work.NetSID_CLOCKS
-		port map (
-			I_CLK			=> OSC_IN,
-			I_RESET		=> nrst,
-			--
-			O_CLK_1M	=> clk01,
-			O_CLK_4M	=> clk04,
-			O_CLK_32M	=> clk32,
-			O_RESET		=> rst				-- timed active high reset
-		);
+	port map (
+		I_CLK			=> CLK_IN,
+		I_RESET		=> nrst,
+		--
+		O_CLK_1M		=> clk01,
+		O_CLK_4M		=> clk04,
+		O_CLK_32M	=> clk32,
+		O_RESET		=> rst				-- timed active high reset
+	);
 
   -----------------------------------------------------------------------------
   -- UART RS232 rx and tx
@@ -183,14 +183,14 @@ begin
   --
 	transmit : uart_tx 
 	port map (
-		data_in							=> tx_data,
+		data_in						=> tx_data,
 		write_buffer				=> write_to_uart,
 		reset_buffer				=> rst,
 		en_16_x_baud				=> en_16_x_baud,
 		serial_out					=> USB_RXD,					-- to RX input of external device
 		buffer_full					=> tx_full,
-		buffer_half_full		=> tx_half_full,
-		clk									=> clk32
+		buffer_half_full			=> tx_half_full,
+		clk							=> clk32
 	);
 
 	receive : uart_rx
@@ -199,11 +199,11 @@ begin
 		read_buffer					=> '1',
 		reset_buffer				=> rst,
 		en_16_x_baud				=> en_16_x_baud,
-		serial_in						=> USB_TXD,					-- to TX output of external device
-		buffer_data_present	=> rx_data_present,
+		serial_in					=> USB_TXD,					-- to TX output of external device
+		buffer_data_present		=> rx_data_present,
 		buffer_full					=> rx_full,
-		buffer_half_full		=> rx_half_full,
-		clk									=> clk32
+		buffer_half_full			=> rx_half_full,
+		clk							=> clk32
 	);
 
   -----------------------------------------------------------------------------
@@ -213,15 +213,15 @@ begin
 	-- dual ported async read / write access
 	--
   u_ram : entity work.RAM_16K
-		port map (
-			DOA		=> ram_do,
-			ADDRA	=> ram_ao,
-			CLKA	=> clk32,
-			--
-			DIB		=> rx_data,
-			ADDRB	=> ram_ai,
-			CLKB	=> nrxdp
-		);
+	port map (
+		DOA	=> ram_do,
+		ADDRA	=> ram_ao,
+		CLKA	=> clk32,
+		--
+		DIB	=> rx_data,
+		ADDRB	=> ram_ai,
+		CLKB	=> nrxdp
+	);
 
   -----------------------------------------------------------------------------
   -- SID 6581
@@ -230,21 +230,21 @@ begin
 	-- Implementation of SID sound chip
 	--
   u_sid6581 : entity work.sid6581
-    port map (
-			clk_1mhz		=> clk01,			-- main SID clock
-			clk32				=> clk32,			-- main clock signal
-			clk_DAC			=> clk32,			-- DAC clock signal, must be as high as possible for the best results
-			reset				=> rst,				-- high active reset signal (reset when reset = '1')
-			cs					=> '1',				-- "chip select", when this signal is '1' this model can be accessed
-			we					=> sid_we,		-- when '1' this model can be written to, otherwise access is considered as read
-			addr				=> sid_addr,	-- address lines (5 bits)
-			di					=> sid_din,		-- data in (to chip, 8 bits)
-			do					=> sid_dout,	-- data out	(from chip, 8 bits)
-			pot_x				=> sid_px,		-- paddle input-X
-			pot_y				=> sid_py,		-- paddle input-Y
-			audio_out		=> audio_pwm,	-- this line outputs the PWM audio-signal
-			audio_data	=> open				-- audio out 18 bits
-		);
+	port map (
+		clk_1mhz			=> clk01,		-- main SID clock
+		clk32				=> clk32,		-- main clock signal
+		clk_DAC			=> clk32,		-- DAC clock signal, must be as high as possible for the best results
+		reset				=> rst,			-- high active reset signal (reset when reset = '1')
+		cs					=> '1',			-- "chip select", when this signal is '1' this model can be accessed
+		we					=> sid_we,		-- when '1' this model can be written to, otherwise access is considered as read
+		addr				=> sid_addr,	-- address lines (5 bits)
+		di					=> sid_din,		-- data in (to chip, 8 bits)
+		do					=> sid_dout,	-- data out	(from chip, 8 bits)
+		pot_x				=> sid_px,		-- paddle input-X
+		pot_y				=> sid_py,		-- paddle input-Y
+		audio_out		=> audio_pwm,	-- this line outputs the PWM audio-signal
+		audio_data		=> open			-- audio out 18 bits
+	);
 
 	-----------------------------------------------------------------------------
 	-- state machine control for ram_to_sid process
@@ -281,36 +281,36 @@ begin
 		elsif rising_edge(clk04) then
 			if fifo_empty = '0' then
 				case stSIDnow is
-					when stInit		=>
-						sid_we			<= '0';
-						ram_ao			<= (others => '0');
-						cycle_cnt		<= (others => '0');
-						stSIDnext		<= stDelay1;
-					when stDelay1	=>
-						sid_we			<= '0';
+					when stInit =>
+						sid_we		<= '0';
+						ram_ao		<= (others => '0');
+						cycle_cnt	<= (others => '0');
+						stSIDnext	<= stDelay1;
+					when stDelay1 =>
+						sid_we		<= '0';
 						cycle_cnt(17 downto 10) <= ram_do;	-- delay high
-						ram_ao			<= ram_ao + 1;
-						stSIDnext		<= stDelay2;
-					when stDelay2	=>
-						cycle_cnt(9 downto 2)  <= ram_do;		-- delay low
-						ram_ao			<= ram_ao + 1;
-						stSIDnext		<= stAddr;
-					when stAddr		=>
+						ram_ao		<= ram_ao + 1;
+						stSIDnext	<= stDelay2;
+					when stDelay2 =>
+						cycle_cnt(9 downto 2)  <= ram_do;	-- delay low
+						ram_ao		<= ram_ao + 1;
+						stSIDnext	<= stAddr;
+					when stAddr =>
 						sid_addr		<= ram_do(4 downto 0);	-- address
-						ram_ao			<= ram_ao + 1;
-						stSIDnext		<= stData;
-					when stData		=>
-						sid_din			<= ram_do;							-- value
-						ram_ao			<= ram_ao + 1;
-						stSIDnext		<= stSync;
-					when stSync		=>
+						ram_ao		<= ram_ao + 1;
+						stSIDnext	<= stData;
+					when stData =>
+						sid_din		<= ram_do;					-- value
+						ram_ao		<= ram_ao + 1;
+						stSIDnext	<= stSync;
+					when stSync =>
 						if cycle_cnt = x"0000" then
 							stSIDnext <= stWrite;
 						else
-							cycle_cnt <= cycle_cnt - 1;				-- wait cycles x4 (since this runs at clk04)
+							cycle_cnt <= cycle_cnt - 1;		-- wait cycles x4 (since this runs at clk04)
 							stSIDnext <= stSync;
 						end if;
-					when stWrite	=>
+					when stWrite =>
 						sid_we		<= '1';
 						stSIDnext	<= stDelay1;
 					when others		=> null;
@@ -373,10 +373,10 @@ begin
 	begin
 		if rising_edge(clk32) then
 			case stUARTnow is
-				when st00		=>
+				when st00 =>
 					write_to_uart <= '1';
 					stUARTnext <= st01;
-				when st01		=>
+				when st01 =>
 					write_to_uart <= '0';
 					stUARTnext <= st01;
 				when others		=> null;
