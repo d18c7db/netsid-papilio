@@ -21,7 +21,7 @@
 --
 --    // simple frequency tuning with error towards nyquist
 --    // Fc is the filter's center frequency, and Fs is the sampling rate
---    F1 = 2*pi*Fc/Fs (* 2^18 for scaling)
+--    F1 = 2*pi*Fc/Fs
 --
 --    // ideal tuning:
 --    F1 = 2 * sin( pi * Fc / Fs )
@@ -89,7 +89,7 @@ architecture Behavioral of sid_filter is
 	signal z0				: signed(35 downto 0) := (others => '0'); -- high pass
 	signal z1				: signed(35 downto 0) := (others => '0'); -- delay band pass
 	signal z2				: signed(35 downto 0) := (others => '0'); -- delay low pass
-	signal Filter_Fc		: signed(17 downto 0) := (others => '0');
+	signal Filter_F1		: signed(17 downto 0) := (others => '0');
 
 	constant DC_offset	: std_logic_vector(17 downto 0)	:= "000000111111111111";
 	constant q				: signed(17 downto 0)	:= "011111111111111111"; -- Q = 1.000, 1/Q = 0.999
@@ -118,7 +118,7 @@ begin
 		if ( f_start = '1' ) then
 			state <= "00";
 			Filter_In <= signed( v1_in + (v2_in + v3_in ) );
-			Filter_Fc <= signed("0000000" & Filter_Fc_hi & Filter_Fc_lo(2 downto 0)); -- raw register, needs to be scaled to Fc somehow
+			Filter_F1 <= signed("0000000" & Filter_Fc_hi & Filter_Fc_lo(2 downto 0)); -- raw register, needs to be scaled to Fc somehow
 
 			voice_mixed <= (DC_offset) +
 			(
@@ -144,10 +144,10 @@ begin
 					mA <= q;
 					mB <= z1(35 downto 18);
 				when "01" => state <= state + 1;
-					mA <= Filter_Fc;
+					mA <= Filter_F1;
 					mB <= Filter_In - (mP(35 downto 18) + z2(35 downto 18));
 				when "10" => state <= state + 1;
-					mA <= Filter_Fc;
+					mA <= Filter_F1;
 					mB <= z1(35 downto 18);
 					z0 <= mB&"000000000000000000";
 					z1 <= mP + z1;
