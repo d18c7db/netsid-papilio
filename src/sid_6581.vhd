@@ -60,46 +60,6 @@ end sid6581;
 
 architecture Behavioral of sid6581 is
 
-	--Implementation Digital to Analog converter
-	component pwm_sddac is
-		port (
-			clk_i		: in  std_logic;							-- main clock signal, the higher the better
-			reset		: in  std_logic;							-- reset input active high
-			dac_o		: out std_logic;							-- PWM output after a simple low-pass filter this is to be considered an analog signal
-			dac_i		: in  std_logic_vector(9 downto 0)	-- binary input of signal to be converted
-		);
-	end component;
-
-	component pwm_sdadc is
-	  port (
- 			clk		: in  std_logic;							-- main clock signal (actually the higher the better)
-			reset		: in  std_logic;							--
-			ADC_out	: out std_logic_vector(7 downto 0);	-- binary input of signal to be converted
-			ADC_in	: inout std_logic							-- "analog" paddle input pin
-		);
-	end component;
-
-	-- Implementation of the SID voices (sound channels)
-	component sid_voice is
-		port (
-			clk_1MHz			: in  std_logic;	-- this line drives the oscilator
-			reset				: in  std_logic;	-- active high signal (i.e. registers are reset when reset=1)
-			Freq_lo			: in  std_logic_vector(7 downto 0);	-- 
-			Freq_hi			: in  std_logic_vector(7 downto 0);	--
-			Pw_lo				: in  std_logic_vector(7 downto 0);	--
-			Pw_hi				: in  std_logic_vector(3 downto 0);	--
-			Control			: in  std_logic_vector(7 downto 0);	--
-			Att_dec			: in  std_logic_vector(7 downto 0);	--
-			Sus_Rel			: in  std_logic_vector(7 downto 0);	--
-			PA_MSB_in		: in  std_logic;											--
-			PA_MSB_out		: out std_logic;										--
-			Osc				: out std_logic_vector(7 downto 0);	--
-			Env				: out std_logic_vector(7 downto 0);	--
-			voice				: out std_logic_vector(11 downto 0)	--
-		);
-	end component;
-
-
 	signal Voice_1_Freq_lo	: std_logic_vector(7 downto 0)	:= (others => '0');
 	signal Voice_1_Freq_hi	: std_logic_vector(7 downto 0)	:= (others => '0');
 	signal Voice_1_Pw_lo		: std_logic_vector(7 downto 0)	:= (others => '0');
@@ -143,27 +103,37 @@ architecture Behavioral of sid6581 is
 	signal voice_1				: std_logic_vector(11 downto 0)	:= (others => '0');
 	signal voice_2				: std_logic_vector(11 downto 0)	:= (others => '0');
 	signal voice_3				: std_logic_vector(11 downto 0)	:= (others => '0');
-	signal voice_3_sel		: std_logic_vector(11 downto 0)	:= (others => '0');
-	signal Filter_Out			: std_logic_vector(17 downto 0)	:= (others => '0');
+	signal voice_mixed		: std_logic_vector(13 downto 0)	:= (others => '0');
+	signal voice_volume		: std_logic_vector(35 downto 0)	:= (others => '0');
 
 	signal divide_0			: std_logic_vector(31 downto 0)	:= (others => '0');
 	signal voice_1_PA_MSB	: std_logic := '0';
 	signal voice_2_PA_MSB	: std_logic := '0';
 	signal voice_3_PA_MSB	: std_logic := '0';
 
+	signal voice1_signed		: signed(12 downto 0);
+	signal voice2_signed		: signed(12 downto 0);
+	signal voice3_signed		: signed(12 downto 0);
+	constant ext_in_signed	: signed(12 downto 0) := to_signed(0,13);
+	signal filtered_audio	: signed(18 downto 0);
+	signal tick_q1, tick_q2	: std_logic;
+	signal input_valid		: std_logic;
+	signal unsigned_audio	: std_logic_vector(17 downto 0);
+	signal unsigned_filt		: std_logic_vector(18 downto 0);
+	signal ff1					: std_logic;
+
 -------------------------------------------------------------------------------
 
 begin
-	digital_to_analog: pwm_sddac
+	digital_to_analog: entity work.pwm_sddac
 		port map(
 			clk_i				=> clk_DAC,
 			reset				=> reset,
-			dac_i				=> Filter_Out(17 downto 8),
+			dac_i				=> unsigned_audio(17 downto 8),
 			dac_o				=> audio_out
 		);
-	audio_data <= Filter_Out;
 	
-	paddle_x: pwm_sdadc
+	paddle_x: entity work.pwm_sdadc
 		port map (
 			clk				=> clk_1MHz,
 			reset				=> reset,
@@ -171,7 +141,7 @@ begin
 			ADC_in 			=> pot_x
 		);
 
-	paddle_y: pwm_sdadc
+	paddle_y: entity work.pwm_sdadc
 		port map (
 			clk				=> clk_1MHz,
 			reset				=> reset,
@@ -179,7 +149,7 @@ begin
 			ADC_in 			=> pot_y
 		);
 
-	sid_voice_1: sid_voice
+	sid_voice_1: entity work.sid_voice
 	port map(
 		clk_1MHz				=> clk_1MHz,
 		reset					=> reset,
@@ -197,7 +167,7 @@ begin
 		voice					=> voice_1
 	);
 
-	sid_voice_2: sid_voice
+	sid_voice_2: entity work.sid_voice
 	port map(
 		clk_1MHz				=> clk_1MHz,
 		reset					=> reset,
@@ -215,7 +185,7 @@ begin
 		voice					=> voice_2
 	);
 
-	sid_voice_3: sid_voice
+	sid_voice_3: entity work.sid_voice
 	port map(
 		clk_1MHz				=> clk_1MHz,
 		reset					=> reset,
@@ -233,27 +203,62 @@ begin
 		voice					=> voice_3
 	);
 
-	svf_filter: entity work.sid_filter
-	port map(
-		clk					=> clk_DAC,
-		f_start				=> clk_1MHz,
-		voice_1				=> voice_1,
-		voice_2				=> voice_2,
-		voice_3				=> voice_3_sel,
-		Filter_Fc_lo		=> Filter_Fc_lo,
-		Filter_Fc_hi		=> Filter_Fc_hi,
-		Filter_Res_Filt	=> Filter_Res_Filt,
-		Filter_Mode_Vol	=> Filter_Mode_Vol,
-		Filter_Out			=> Filter_Out	
+-------------------------------------------------------------------------------------
+	do						<= do_buf;
+
+-- SID filters
+
+	process (clk_1MHz,reset)
+	begin
+		if reset='1' then
+			ff1<='0';
+		else
+			if rising_edge(clk_1MHz) then
+				ff1<=not ff1;
+			end if;
+		end if;
+	end process;
+
+	process(clk32)
+	begin
+		if rising_edge(clk32) then
+			tick_q1 <= ff1;
+			tick_q2 <= tick_q1;
+		end if;
+	end process;
+
+	input_valid <= '1' when tick_q1 /=tick_q2 else '0';
+
+	voice1_signed <= signed("0" & voice_1) - 2048;
+	voice2_signed <= signed("0" & voice_2) - 2048;
+	voice3_signed <= signed("0" & voice_3) - 2048;
+
+	filters: entity work.sid_filters 
+	port map (
+		clk			=> clk32,
+		rst			=> reset,
+		-- SID registers.
+		Fc_lo			=> Filter_Fc_lo,
+		Fc_hi			=> Filter_Fc_hi,
+		Res_Filt		=> Filter_Res_Filt,
+		Mode_Vol		=> Filter_Mode_Vol,
+		-- Voices - resampled to 13 bit
+		voice1		=> voice1_signed,
+		voice2		=> voice2_signed,
+		voice3		=> voice3_signed,
+		--
+		input_valid => input_valid,
+		ext_in		=> ext_in_signed,
+
+		sound			=> filtered_audio,
+		valid			=> open
 	);
 
-	-- bit 3OFF of Mode/Vol register $24 can disconnect voice3 from audio path
-	voice_3_sel <= voice_3 when Filter_Mode_Vol(7)= '0' else (others=>'0');
+	unsigned_filt 	<= std_logic_vector(filtered_audio + "1000000000000000000");
+	unsigned_audio	<= unsigned_filt(18 downto 1);
+	audio_data		<= unsigned_audio;
 
--------------------------------------------------------------------------------------
-	do <= do_buf;
-
-	-- Register decoding
+-- Register decoding
 	register_decoder:process(clk32)
 	begin
 		if rising_edge(clk32) then
