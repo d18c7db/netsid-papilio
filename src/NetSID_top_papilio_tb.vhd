@@ -34,7 +34,7 @@ library std;
 	use std.textio.all;
 
 entity netsid_tb is
-	generic(stim_file: string :="stim.txt");
+	generic(stim_file: string :="..\src\stim.txt");
 end netsid_tb;
 
 architecture behavior of netsid_tb is 
@@ -117,10 +117,10 @@ begin
 	-- Stimulus process
 	stim_proc: process
 	begin		
-		i_reset <= '0';
+		i_reset <= '1';
 		baud_run <= '0';
 		wait for clock_period*5;
-		i_reset <= '1';
+		i_reset <= '0';
 		wait for clock_period*10;
 		baud_run <= '1';
 		wait;

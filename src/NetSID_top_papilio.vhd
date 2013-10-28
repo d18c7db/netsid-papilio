@@ -106,7 +106,6 @@ architecture RTL of NetSID is
 		stIdle
 	);
 
-	signal clk_div					: std_logic_vector(4 downto 0) := (others => '0');
 	signal clk01					: std_logic := '0';	--  1 Mhz
 	signal clk04					: std_logic := '0';	--  4 Mhz
 	signal clk32					: std_logic := '0';	-- 32 Mhz
@@ -116,21 +115,16 @@ architecture RTL of NetSID is
 	signal tx_data					: std_logic_vector(7 downto 0) := (others => '1');
 	signal rx_data					: std_logic_vector(7 downto 0) := (others => '1');
 	signal tx_full					: std_logic := '0';
-	signal rx_full					: std_logic := '0';
-	signal tx_half_full			: std_logic := '0';
-	signal rx_half_full			: std_logic := '0';
 	signal write_to_uart			: std_logic := '0';
 	signal rx_data_present		: std_logic := '0';
 	signal en_16_x_baud			: std_logic := '0';
 
 	signal stSIDnow				: RAMtoSIDState := stInit;
 	signal stSIDnext				: RAMtoSIDState := stInit;
-	signal sid_addr				: std_logic_vector(4 downto 0) := (others => '0');
-	signal sid_dout				: std_logic_vector(7 downto 0) := (others => '0');
-	signal sid_din					: std_logic_vector(7 downto 0) := (others => '0');
+	signal sid_audio				: std_logic_vector(17 downto 0) := (others => '0');
+	signal sid_addr				: std_logic_vector( 4 downto 0) := (others => '0');
+	signal sid_din					: std_logic_vector( 7 downto 0) := (others => '0');
 	signal sid_we					: std_logic := '0';
-	signal sid_px					: std_logic := '0';
-	signal sid_py					: std_logic := '0';
 
 	signal ram_ai					: std_logic_vector(13 downto 0) := (others => '0');
 	signal ram_ao					: std_logic_vector(13 downto 0) := (others => '1');
@@ -142,7 +136,6 @@ architecture RTL of NetSID is
 	signal audio_pwm				: std_logic := '0';
 	signal nrxdp					: std_logic := '0';
 	signal fifo_empty				: std_logic := '1';
-	signal fifo_stop				: std_logic := '1';
 	signal buf_full				: std_logic := '0';
 	signal buf_full_last			: std_logic := '0';
 	signal buf_full_fe			: std_logic := '0';
@@ -181,7 +174,7 @@ begin
   -- 8-bit, 1 stop-bit, no parity transmit and receive macros.
   -- Each contains an embedded 16-byte FIFO buffer.
   --
-	transmit : uart_tx 
+	u_tx : uart_tx 
 	port map (
 		data_in						=> tx_data,
 		write_buffer				=> write_to_uart,
@@ -189,11 +182,11 @@ begin
 		en_16_x_baud				=> en_16_x_baud,
 		serial_out					=> USB_RXD,					-- to RX input of external device
 		buffer_full					=> tx_full,
-		buffer_half_full			=> tx_half_full,
+		buffer_half_full			=> open,
 		clk							=> clk32
 	);
 
-	receive : uart_rx
+	u_rx : uart_rx
 	port map (
 		data_out						=> rx_data,
 		read_buffer					=> '1',
@@ -201,8 +194,8 @@ begin
 		en_16_x_baud				=> en_16_x_baud,
 		serial_in					=> USB_TXD,					-- to TX output of external device
 		buffer_data_present		=> rx_data_present,
-		buffer_full					=> rx_full,
-		buffer_half_full			=> rx_half_full,
+		buffer_full					=> open,
+		buffer_half_full			=> open,
 		clk							=> clk32
 	);
 
@@ -223,6 +216,14 @@ begin
 		CLKB	=> nrxdp
 	);
 
+	u_dac: entity work.dac
+	port map(
+		clk_i				=> clk32,
+		reset				=> rst,
+		dac_i				=> sid_audio(17 downto 8),
+		dac_o				=> audio_pwm
+	);
+
   -----------------------------------------------------------------------------
   -- SID 6581
   -----------------------------------------------------------------------------
@@ -233,17 +234,15 @@ begin
 	port map (
 		clk_1mhz			=> clk01,		-- main SID clock
 		clk32				=> clk32,		-- main clock signal
-		clk_DAC			=> clk32,		-- DAC clock signal, must be as high as possible for the best results
-		reset				=> rst,			-- high active reset signal (reset when reset = '1')
-		cs					=> '1',			-- "chip select", when this signal is '1' this model can be accessed
-		we					=> sid_we,		-- when '1' this model can be written to, otherwise access is considered as read
-		addr				=> sid_addr,	-- address lines (5 bits)
-		di					=> sid_din,		-- data in (to chip, 8 bits)
-		do					=> sid_dout,	-- data out	(from chip, 8 bits)
-		pot_x				=> sid_px,		-- paddle input-X
-		pot_y				=> sid_py,		-- paddle input-Y
-		audio_out		=> audio_pwm,	-- this line outputs the PWM audio-signal
-		audio_data		=> open			-- audio out 18 bits
+		reset				=> rst,			-- active high reset signal
+		cs					=> '1',			-- active high  chip select
+		we					=> sid_we,		-- active high write enable
+		addr				=> sid_addr,	-- address lines 5 bits
+		di					=> sid_din,		-- data to chip, 8 bits
+		do					=> open,			-- data from chip, 8 bits
+		pot_x				=> x"00",		-- paddle input-X 8 bits
+		pot_y				=> x"00",		-- paddle input-Y 8 bits
+		audio_data		=> sid_audio	-- audio out 18 bits
 	);
 
 	-----------------------------------------------------------------------------

@@ -40,20 +40,17 @@ use IEEE.numeric_std.all;
 
 entity sid6581 is
 	port (
-		clk_1MHz			: in std_logic;		-- main SID clock signal
-		clk32				: in std_logic;		-- main clock signal
-		clk_DAC			: in std_logic;		-- DAC clock signal, must be as high as possible for the best results
-		reset				: in std_logic;		-- high active signal (reset when reset = '1')
-		cs					: in std_logic;		-- "chip select", when this signal is '1' this model can be accessed
+		clk_1MHz			: in  std_logic;		-- main SID clock signal
+		clk32				: in  std_logic;		-- main clock signal
+		reset				: in  std_logic;		-- high active signal (reset when reset = '1')
+		cs					: in  std_logic;		-- "chip select", when this signal is '1' this model can be accessed
 		we					: in std_logic;		-- when '1' this model can be written to, otherwise access is considered as read
 
-		addr				: in std_logic_vector(4 downto 0);	-- address lines
-		di					: in std_logic_vector(7 downto 0);	-- data in (to chip)
+		addr				: in  std_logic_vector(4 downto 0);	-- address lines
+		di					: in  std_logic_vector(7 downto 0);	-- data in (to chip)
 		do					: out std_logic_vector(7 downto 0);	-- data out	(from chip)
-
-		pot_x				: inout std_logic;	-- paddle input-X
-		pot_y				: inout std_logic;	-- paddle input-Y
-		audio_out		: out std_logic;		-- this line holds the audio-signal in PWM format
+		pot_x				: in  std_logic_vector(7 downto 0);	-- paddle input-X
+		pot_y				: in  std_logic_vector(7 downto 0);	-- paddle input-Y
 		audio_data		: out std_logic_vector(17 downto 0)
 	);
 end sid6581;
@@ -67,8 +64,6 @@ architecture Behavioral of sid6581 is
 	signal Voice_1_Control	: std_logic_vector(7 downto 0)	:= (others => '0');
 	signal Voice_1_Att_dec	: std_logic_vector(7 downto 0)	:= (others => '0');
 	signal Voice_1_Sus_Rel	: std_logic_vector(7 downto 0)	:= (others => '0');
-	signal Voice_1_Osc		: std_logic_vector(7 downto 0)	:= (others => '0');
-	signal Voice_1_Env		: std_logic_vector(7 downto 0)	:= (others => '0');
 
 	signal Voice_2_Freq_lo	: std_logic_vector(7 downto 0)	:= (others => '0');
 	signal Voice_2_Freq_hi	: std_logic_vector(7 downto 0)	:= (others => '0');
@@ -77,8 +72,6 @@ architecture Behavioral of sid6581 is
 	signal Voice_2_Control	: std_logic_vector(7 downto 0)	:= (others => '0');
 	signal Voice_2_Att_dec	: std_logic_vector(7 downto 0)	:= (others => '0');
 	signal Voice_2_Sus_Rel	: std_logic_vector(7 downto 0)	:= (others => '0');
-	signal Voice_2_Osc		: std_logic_vector(7 downto 0)	:= (others => '0');
-	signal Voice_2_Env		: std_logic_vector(7 downto 0)	:= (others => '0');
 
 	signal Voice_3_Freq_lo	: std_logic_vector(7 downto 0)	:= (others => '0');
 	signal Voice_3_Freq_hi	: std_logic_vector(7 downto 0)	:= (others => '0');
@@ -93,8 +86,6 @@ architecture Behavioral of sid6581 is
 	signal Filter_Res_Filt	: std_logic_vector(7 downto 0)	:= (others => '0');
 	signal Filter_Mode_Vol	: std_logic_vector(7 downto 0)	:= (others => '0');
 
-	signal Misc_PotX			: std_logic_vector(7 downto 0)	:= (others => '0');
-	signal Misc_PotY			: std_logic_vector(7 downto 0)	:= (others => '0');
 	signal Misc_Osc3_Random	: std_logic_vector(7 downto 0)	:= (others => '0');
 	signal Misc_Env3			: std_logic_vector(7 downto 0)	:= (others => '0');
 
@@ -103,8 +94,6 @@ architecture Behavioral of sid6581 is
 	signal voice_1				: std_logic_vector(11 downto 0)	:= (others => '0');
 	signal voice_2				: std_logic_vector(11 downto 0)	:= (others => '0');
 	signal voice_3				: std_logic_vector(11 downto 0)	:= (others => '0');
-	signal voice_mixed		: std_logic_vector(13 downto 0)	:= (others => '0');
-	signal voice_volume		: std_logic_vector(35 downto 0)	:= (others => '0');
 
 	signal divide_0			: std_logic_vector(31 downto 0)	:= (others => '0');
 	signal voice_1_PA_MSB	: std_logic := '0';
@@ -114,6 +103,8 @@ architecture Behavioral of sid6581 is
 	signal voice1_signed		: signed(12 downto 0);
 	signal voice2_signed		: signed(12 downto 0);
 	signal voice3_signed		: signed(12 downto 0);
+
+	-- filter
 	constant ext_in_signed	: signed(12 downto 0) := to_signed(0,13);
 	signal filtered_audio	: signed(18 downto 0);
 	signal tick_q1, tick_q2	: std_logic;
@@ -125,30 +116,8 @@ architecture Behavioral of sid6581 is
 -------------------------------------------------------------------------------
 
 begin
-	digital_to_analog: entity work.pwm_sddac
-		port map(
-			clk_i				=> clk_DAC,
-			reset				=> reset,
-			dac_i				=> unsigned_audio(17 downto 8),
-			dac_o				=> audio_out
-		);
+
 	
-	paddle_x: entity work.pwm_sdadc
-		port map (
-			clk				=> clk_1MHz,
-			reset				=> reset,
-			ADC_out 			=> Misc_PotX,
-			ADC_in 			=> pot_x
-		);
-
-	paddle_y: entity work.pwm_sdadc
-		port map (
-			clk				=> clk_1MHz,
-			reset				=> reset,
-			ADC_out 			=> Misc_PotY,
-			ADC_in 			=> pot_y
-		);
-
 	sid_voice_1: entity work.sid_voice
 	port map(
 		clk_1MHz				=> clk_1MHz,
@@ -162,8 +131,8 @@ begin
 		Sus_Rel				=> Voice_1_Sus_Rel,
 		PA_MSB_in			=> voice_3_PA_MSB,
 		PA_MSB_out			=> voice_1_PA_MSB,
-		Osc					=> Voice_1_Osc,
-		Env					=> Voice_1_Env,
+--		Osc					=> open,
+--		Env					=> open,
 		voice					=> voice_1
 	);
 
@@ -180,8 +149,8 @@ begin
 		Sus_Rel				=> Voice_2_Sus_Rel,
 		PA_MSB_in			=> voice_1_PA_MSB,
 		PA_MSB_out			=> voice_2_PA_MSB,
-		Osc					=> Voice_2_Osc,
-		Env					=> Voice_2_Env,
+--		Osc					=> open,
+--		Env					=> open,
 		voice					=> voice_2
 	);
 
@@ -359,11 +328,10 @@ begin
 
 					else			-- Read from SID-register
 							-------------------------
-						--case CONV_INTEGER(addr) is
 						case addr is
 							-------------------------------------- Misc
-							when "11001" =>	do_buf	<= Misc_PotX;
-							when "11010" =>	do_buf	<= Misc_PotY;
+							when "11001" =>	do_buf	<= pot_x;
+							when "11010" =>	do_buf	<= pot_Y;
 							when "11011" =>	do_buf	<= Misc_Osc3_Random;
 							when "11100" =>	do_buf	<= Misc_Env3;
 							--------------------------------------
